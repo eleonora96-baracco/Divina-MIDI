@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+.pytest_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Generated data and outputs (reproducible with the scripts)
+data/
+output/
+*.npy
+*.mid
+*.wordvectors
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
