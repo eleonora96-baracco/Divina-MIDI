@@ -23,7 +23,7 @@ from bs4 import BeautifulSoup
 
 API_URL = "https://it.wikisource.org/w/api.php"
 SOURCE_URL = "https://it.wikisource.org/wiki/Divina_Commedia"
-USER_AGENT = "divina-midi/0.1 (https://github.com/eleonora96-baracco/divina-midi)"
+USER_AGENT = "divina-midi/0.1 (https://github.com/eleonora96-baracco/Divina-MIDI)"
 
 CANTICHE = {"Inferno": 34, "Purgatorio": 33, "Paradiso": 33}
 COLUMNS = ["cantica", "canto", "tercet", "line", "text"]
