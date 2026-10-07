@@ -1,38 +1,41 @@
 # divina-midi
 
-Trasformare i canti della *Divina Commedia* in musica MIDI.
+Turn the cantos of Dante's *Divina Commedia* into MIDI music.
 
-Il progetto confronta approcci di complessità crescente per tradurre il testo in note:
+The project compares approaches of increasing sophistication for translating the text into notes:
 
-1. **Word2Vec**: vettori addestrati sul testo, mappati su altezze. Il risultato è artistico ma arbitrario.
-2. **Embedding contestuali** (BERT multilingue): versi simili suonano in modo simile.
-3. **Sentiment / emozione**: dimensioni con un significato, mappate su convenzioni musicali (modo, tempo, dinamica).
+1. **Word2Vec**: vectors trained on the text, mapped to pitches. The result is artistic but arbitrary.
+2. **Contextual embeddings** (multilingual BERT): similar verses sound similar.
+3. **Sentiment / emotion**: dimensions with a meaning, mapped onto musical conventions (mode, tempo, dynamics).
 
-> 🚧 Work in progress: per ora è disponibile solo il download del corpus.
+> 🚧 Work in progress: only the corpus download is available so far.
 
-## Installazione
+## Installation
 
 ```bash
 python -m venv .venv
 .venv\Scripts\activate          # Windows
+source .venv/bin/activate       # macOS / Linux
 pip install -e ".[dev]"
 ```
 
-## Uso
+## Usage
 
-Scaricare il testo da Wikisource (100 canti, ~1 minuto):
+Download the text from Wikisource (100 cantos, about one minute):
 
 ```bash
 divina-midi download
 ```
 
-Il risultato è `data/commedia.csv`, con un verso per riga:
+This creates `data/commedia.csv`, with one verse per row:
 
 | cantica | canto | tercet | line | text |
 |---|---|---|---|---|
 | Inferno | 1 | 1 | 1 | Nel mezzo del cammin di nostra vita |
 
-In Python:
+`tercet` is the stanza number within the canto (the closing single verse of each canto counts as its own stanza) and `line` is the verse number within the canto.
+
+From Python:
 
 ```python
 from divina_midi.corpus import load_corpus, select
@@ -41,12 +44,14 @@ df = load_corpus()
 inferno_1 = select(df, cantica="inferno", canto=1)
 ```
 
-## Test
+## Tests
 
 ```bash
 pytest
 ```
 
-## Fonte del testo
+Tests marked `corpus` check the full text (14,233 verses, every canto in terza rima) and are skipped until the corpus has been downloaded.
 
-Il testo è scaricato da [Wikisource](https://it.wikisource.org/wiki/Divina_Commedia) (licenza [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)) e non è incluso nel repository.
+## Text source
+
+The text is downloaded from [Italian Wikisource](https://it.wikisource.org/wiki/Divina_Commedia) (licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)) and is not included in this repository.
