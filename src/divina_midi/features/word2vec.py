@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 from gensim.models import Word2Vec
 
-from ..text import tokenize
+from ..text import tokenize, words
 from . import POSITION_COLUMNS
 
 
@@ -32,14 +32,10 @@ def _dim_columns(model: Word2Vec) -> list[str]:
 
 def word_features(corpus: pd.DataFrame, model: Word2Vec) -> pd.DataFrame:
     """One row per word: position, the word, its length and its vector."""
-    rows, vectors = [], []
-    for verse in corpus.itertuples(index=False):
-        for i, word in enumerate(tokenize(verse.text)):
-            rows.append((verse.cantica, verse.canto, verse.tercet, verse.line, i, word, len(word)))
-            vectors.append(model.wv[word])
-    df = pd.DataFrame(rows, columns=POSITION_COLUMNS + ["word_index", "word", "length"])
-    dims = pd.DataFrame(np.array(vectors), columns=_dim_columns(model))
-    return pd.concat([df, dims], axis=1)
+    table = words(corpus)
+    dims = pd.DataFrame(np.array([model.wv[word] for word in table["word"]]),
+                        columns=_dim_columns(model))
+    return pd.concat([table, dims], axis=1)
 
 
 def verse_features(corpus: pd.DataFrame, model: Word2Vec) -> pd.DataFrame:

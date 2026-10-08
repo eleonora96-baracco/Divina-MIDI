@@ -6,8 +6,9 @@ import argparse
 from pathlib import Path
 
 from . import corpus
-from .mapping import SCALES, Mapping
-from .midi import write_midi
+from .mapping import SCALES, AffectMapping, Mapping
+from .midi import PIANO, STRINGS, write_midi, write_tracks
+from .text import words
 
 
 def cmd_download(args: argparse.Namespace) -> None:
@@ -17,20 +18,42 @@ def cmd_download(args: argparse.Namespace) -> None:
 
 
 def cmd_render(args: argparse.Namespace) -> None:
+    text = corpus.load_corpus(args.corpus)
+    if corpus.select(text, cantica=args.cantica, canto=args.canto).empty:
+        raise SystemExit(f"No verses for {args.cantica} {args.canto}")
+    if args.method == "sentiment":
+        render_sentiment(text, args)
+    else:
+        render_word2vec(text, args)
+
+
+def render_sentiment(text, args: argparse.Namespace) -> None:
+    from .features import sentiment
+
+    # First run scores the whole poem (several minutes); later runs read the cache.
+    affect = sentiment.affect(text)
+    mapping = AffectMapping().fit(affect)
+    selected = corpus.select(affect, cantica=args.cantica, canto=args.canto)
+    melody, chords = mapping.render(words(corpus.select(text, cantica=args.cantica, canto=args.canto)),
+                                    selected)
+
+    out = args.out or Path("output") / f"{args.cantica}_{args.canto:02d}_sentiment.mid"
+    write_tracks([(melody, PIANO), (chords, STRINGS)], out, tempo_bpm=args.tempo)
+    modes = mapping.plan(selected)["mode"].value_counts()
+    print(f"Saved {len(melody)} notes and {len(chords) // 3} chords to {out}")
+    print("Modes used:", ", ".join(f"{mode} {count}" for mode, count in modes.items()))
+
+
+def render_word2vec(text, args: argparse.Namespace) -> None:
     from .features import word2vec
 
-    text = corpus.load_corpus(args.corpus)
     model = word2vec.train(text, seed=args.seed)
     extract = word2vec.word_features if args.unit == "word" else word2vec.verse_features
 
     # Fit the mapping on the whole poem so every canto shares the same scale.
     features = extract(text, model)
     mapping = Mapping(scale=args.scale).fit(features)
-    selected = corpus.select(features, cantica=args.cantica, canto=args.canto)
-    if selected.empty:
-        raise SystemExit(f"No verses for {args.cantica} {args.canto}")
-
-    notes = mapping.render(selected)
+    notes = mapping.render(corpus.select(features, cantica=args.cantica, canto=args.canto))
     out = args.out or Path("output") / f"{args.cantica.lower()}_{args.canto:02d}_{args.method}_{args.unit}.mid"
     write_midi(notes, out, tempo_bpm=args.tempo)
     print(f"Saved {len(notes)} notes to {out}")
@@ -49,10 +72,12 @@ def main(argv: list[str] | None = None) -> None:
     render.add_argument("--cantica", required=True, choices=[c.lower() for c in corpus.CANTICHE],
                         type=str.lower)
     render.add_argument("--canto", required=True, type=int)
-    render.add_argument("--method", default="word2vec", choices=["word2vec"])
+    render.add_argument("--method", default="word2vec", choices=["word2vec", "sentiment"],
+                        help="sentiment needs the 'sentiment' extra")
     render.add_argument("--unit", default="word", choices=["word", "verse"],
-                        help="one note per word or per verse")
-    render.add_argument("--scale", default="c_major", choices=sorted(SCALES))
+                        help="word2vec only: one note per word or per verse")
+    render.add_argument("--scale", default="c_major", choices=sorted(SCALES),
+                        help="word2vec only (with sentiment the text picks the mode)")
     render.add_argument("--tempo", type=float, default=90, help="beats per minute")
     render.add_argument("--seed", type=int, default=42)
     render.add_argument("--corpus", type=Path, default=corpus.DEFAULT_PATH)

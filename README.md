@@ -8,15 +8,23 @@ The project compares approaches of increasing sophistication for translating the
 2. **Contextual embeddings** (multilingual BERT): similar verses sound similar.
 3. **Sentiment / emotion**: dimensions with a meaning, mapped onto musical conventions (mode, tempo, dynamics).
 
-> 🚧 Work in progress: the Word2Vec level is available; the other two are coming.
+> 🚧 Work in progress: the Word2Vec and sentiment levels are available; contextual embeddings are coming.
 
 ## Installation
+
+Requires Python 3.9+ (developed on 3.12).
 
 ```bash
 python -m venv .venv
 .venv\Scripts\activate          # Windows
 source .venv/bin/activate       # macOS / Linux
 pip install -e ".[dev]"
+```
+
+The sentiment level needs PyTorch and Hugging Face Transformers (about 1 GB with the models), so it is an optional extra; the notebooks need Jupyter and Matplotlib:
+
+```bash
+pip install -e ".[dev,sentiment,notebooks]"
 ```
 
 ## Usage
@@ -47,23 +55,42 @@ inferno_1 = select(df, cantica="inferno", canto=1)
 ### Rendering a canto
 
 ```bash
-divina-midi render --cantica inferno --canto 1
+divina-midi render --cantica inferno --canto 1                      # Word2Vec level
+divina-midi render --cantica inferno --canto 1 --method sentiment   # sentiment level
 ```
 
-This writes `output/inferno_01_word2vec_word.mid`. Useful options:
+This writes `output/inferno_01_word2vec_word.mid` or `output/inferno_01_sentiment.mid`. The first sentiment run scores the whole poem (about 8 minutes on a CPU) and caches the results in `data/sentiment/`. Options:
 
 | Option | Values | Default |
 |---|---|---|
-| `--unit` | `word` (one note per word) or `verse` (one note per verse) | `word` |
-| `--scale` | `c_major`, `a_minor`, `c_pentatonic`, `chromatic` | `c_major` |
+| `--method` | `word2vec` or `sentiment` | `word2vec` |
 | `--tempo` | beats per minute | `90` |
-| `--seed` | random seed for Word2Vec training | `42` |
+| `--unit` | Word2Vec only: `word` (one note per word) or `verse` (one note per verse) | `word` |
+| `--scale` | Word2Vec only: `c_major`, `a_minor`, `c_pentatonic`, `chromatic` | `c_major` |
+| `--seed` | Word2Vec only: random seed for training | `42` |
 
-### How text becomes music
+## How text becomes music
 
-1. **Features**: each word (or verse) becomes a row of numbers. With Word2Vec these are the dimensions of a vector trained on the whole poem, plus the word length.
-2. **Mapping**: one feature drives the pitch (within the chosen scale), one the velocity, one the duration. Each feature's range is learned from the whole poem, ignoring outliers, so the same value gives the same note in every canto.
-3. **Terza rima**: independently of the features, the last note of each tercet is accented and lengthened, and short rests separate verses and tercets.
+Both levels share the same principles: every feature's range is learned from the **whole poem**, ignoring outliers, so the same value gives the same music in every canto; and the **terza rima** is always audible, with rests between verses and tercets and an accent on the note that closes each tercet.
+
+### Level 1: Word2Vec
+
+Each word becomes a vector trained on the whole poem. One dimension drives the pitch (within the chosen scale), another the velocity, and the word length the duration. The vector dimensions have no meaning, so the music follows word co-occurrence patterns: the three cantiche end up with almost the same distribution of notes.
+
+### Level 3: sentiment
+
+Each tercet is scored by two Italian classifiers, [feel-it sentiment](https://huggingface.co/MilaNLProc/feel-it-italian-sentiment) and [feel-it emotion](https://huggingface.co/MilaNLProc/feel-it-italian-emotion). Their scores are smoothed over neighbouring tercets and mapped onto musical conventions:
+
+| From the text (per tercet) | To the music |
+|---|---|
+| **valence** (positive vs negative) | **mode**, from darkest to brightest: Phrygian, Aeolian (minor), Dorian, Mixolydian, Ionian (major), Lydian |
+| **arousal** (anger, fear or joy vs sadness) | **speed and loudness** |
+| **cantica** | **register**: Inferno low, Purgatorio middle, Paradiso high |
+| **tercet structure** | verses end on the fifth, the third, then the root: open, open, closed |
+
+A piano plays the melody (one note per word) and strings hold one chord per tercet, so major and minor can be heard. Over the whole poem, 53% of the Inferno's tercets are in Phrygian, the darkest mode, against 20% of the Paradiso's; Ionian and Lydian together go from 8% to 36%.
+
+[`notebooks/01_sentiment_feasibility.ipynb`](notebooks/01_sentiment_feasibility.ipynb) checks whether these models make sense on Dante's language, and where they fail.
 
 ## Tests
 

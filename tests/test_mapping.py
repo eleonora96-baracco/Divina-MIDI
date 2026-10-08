@@ -62,6 +62,6 @@ def test_write_midi_roundtrip(tmp_path):
     notes = Mapping().fit(features).render(features)
     path = write_midi(notes, tmp_path / "out.mid")
 
-    on = [m for m in mido.MidiFile(path).tracks[0] if m.type == "note_on"]
+    on = [m for m in mido.MidiFile(path).tracks[-1] if m.type == "note_on"]
     assert [m.note for m in on] == [n.pitch for n in notes]
     assert [m.velocity for m in on] == [n.velocity for n in notes]

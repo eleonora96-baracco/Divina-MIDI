@@ -70,3 +70,18 @@ def tercet_features(corpus: pd.DataFrame, model: str = "feel-it-sentiment",
         cache.parent.mkdir(parents=True, exist_ok=True)
         result.to_csv(cache, index=False, encoding="utf-8")
     return result
+
+
+def affect(corpus: pd.DataFrame,
+           cache_dir: Optional[Path] = Path("data") / "sentiment") -> pd.DataFrame:
+    """Tercets with two affect dimensions, from the two feel-it models.
+
+    - ``valence``: positive vs negative (sentiment model).
+    - ``arousal``: energy, taken as the strongest of anger / fear / joy against
+      sadness, the one low-energy emotion of the emotion model.
+    """
+    sent = tercet_features(corpus, "feel-it-sentiment", cache_dir)
+    emo = tercet_features(corpus, "feel-it-emotion", cache_dir)
+    high = emo[["anger", "fear", "joy"]].to_numpy()
+    emo = emo[TERCET_COLUMNS].assign(arousal=np.logaddexp.reduce(high, axis=1) - emo["sadness"])
+    return sent[TERCET_COLUMNS + ["line", "text", "valence"]].merge(emo, on=TERCET_COLUMNS)
