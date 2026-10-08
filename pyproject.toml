@@ -7,6 +7,8 @@ name = "divina-midi"
 version = "0.1.0"
 description = "Turn the cantos of Dante's Divina Commedia into MIDI music, from word embeddings to sentiment analysis."
 readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Eleonora Baracco" }]
 requires-python = ">=3.9"
 dependencies = [
     "beautifulsoup4>=4.9",
@@ -22,7 +24,7 @@ dev = ["pytest>=7"]
 # feel-it's 2021 tokenizer files don't load with transformers 5.
 sentiment = ["transformers>=4.40,<5","torch>=2.6", "sentencepiece", "protobuf"]
 notebooks = ["jupyter", "matplotlib"]
-audio = ["tinysoundfont>=0.3.7"]
+audio = ["tinysoundfont>=0.3.7", "soundfile>=0.13"]
 
 [project.scripts]
 divina-midi = "divina_midi.cli:main"

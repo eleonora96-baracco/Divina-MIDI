@@ -1,12 +1,21 @@
-# divina-midi
+# Divina MIDI
 
-Turn the cantos of Dante's *Divina Commedia* into MIDI music.
+[![tests](https://github.com/eleonora96-baracco/Divina-MIDI/actions/workflows/tests.yml/badge.svg)](https://github.com/eleonora96-baracco/Divina-MIDI/actions/workflows/tests.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-The project compares approaches of increasing sophistication for translating the text into notes:
+Turn the cantos of Dante's *Divina Commedia* into music.
 
-1. **Word2Vec**: vectors trained on the text, mapped to pitches. The result is artistic but arbitrary.
-2. **Contextual embeddings** (a multilingual sentence model): the music follows the structure of the language, but its axes still have no name.
-3. **Sentiment / emotion**: dimensions with a meaning, mapped onto musical conventions (mode, tempo, dynamics).
+**🎧 [Listen to the demo](https://eleonora96-baracco.github.io/Divina-MIDI/)**: the first canto of each cantica, rendered three ways.
+
+The project compares three approaches of increasing sophistication for translating the text into notes:
+
+| Level | What drives the music | What you hear |
+|---|---|---|
+| 1. **Word2Vec** | vectors learned from the poem itself | artistic but arbitrary: the three cantiche sound almost the same |
+| 2. **Contextual embeddings** | a multilingual language model reading each verse | the structure of the language, with axes that still have no name |
+| 3. **Sentiment** | Italian classifiers scoring each tercet's emotion | the arc from Hell to Paradise, through mode, register, speed and dynamics |
+
+Every word of the poem becomes a note, so a canto lasts 10 to 13 minutes: about as long as reading it aloud.
 
 ## Installation
 
@@ -24,6 +33,8 @@ The embeddings and sentiment levels need PyTorch and Hugging Face Transformers (
 ```bash
 pip install -e ".[dev,sentiment,notebooks]"
 ```
+
+Rendering to audio (WAV or MP3) is a third extra, `audio`.
 
 ## Usage
 
@@ -78,7 +89,15 @@ divina-midi audio                 # every .mid file in output/
 divina-midi audio output/inferno_01_sentiment.mid
 ```
 
-The first run downloads [GeneralUser GS](https://github.com/mrbumpy409/GeneralUser-GS) (32 MB, free to use) into `data/soundfonts/`; use `--soundfont` for another one.
+The first run downloads [GeneralUser GS](https://github.com/mrbumpy409/GeneralUser-GS) (32 MB, free to use) into `data/soundfonts/`; use `--soundfont` for another one. Add `--format mp3` for compressed files and `--seconds 60` for an excerpt.
+
+### Rebuilding the demo page
+
+The [demo page](docs/index.html) is served by GitHub Pages from `docs/`. To regenerate its audio excerpts and chart data (needs all the extras):
+
+```bash
+divina-midi demo
+```
 
 ## How text becomes music
 
@@ -109,14 +128,41 @@ A piano plays the melody (one note per word) and strings hold one chord per terc
 
 [`notebooks/01_sentiment_feasibility.ipynb`](notebooks/01_sentiment_feasibility.ipynb) checks whether these models make sense on Dante's language, and where they fail.
 
+## Project structure
+
+```
+src/divina_midi/
+├── corpus.py          # download and parse the text from Wikisource
+├── text.py            # normalization and tokenization
+├── features/          # one extractor per level
+│   ├── word2vec.py
+│   ├── embeddings.py
+│   └── sentiment.py
+├── mapping.py         # features -> notes (Mapping for levels 1-2, AffectMapping for level 3)
+├── midi.py            # notes -> MIDI file
+├── audio.py           # MIDI -> WAV / MP3 with a SoundFont
+└── cli.py             # the divina-midi command
+notebooks/             # analyses (sentiment feasibility)
+docs/                  # demo page
+tests/
+```
+
+The project grew out of a set of exploratory notebooks; this package rewrites them into a reproducible pipeline.
+
 ## Tests
 
 ```bash
 pytest
 ```
 
-Tests marked `corpus` check the full text (14,233 verses, every canto in terza rima) and are skipped until the corpus has been downloaded.
+Tests that need the downloaded corpus, the models or the SoundFont are skipped when those are missing; GitHub Actions runs the rest on Python 3.9 and 3.12 at every push.
 
-## Text source
+## Credits
 
-The text is downloaded from [Italian Wikisource](https://it.wikisource.org/wiki/Divina_Commedia) (licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)) and is not included in this repository.
+- **Text**: [Italian Wikisource](https://it.wikisource.org/wiki/Divina_Commedia), licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). It is downloaded by the code and not included in this repository.
+- **Models**: [feel-it](https://huggingface.co/MilaNLProc/feel-it-italian-sentiment) by MilaNLProc (sentiment and emotion), [paraphrase-multilingual-MiniLM-L12-v2](https://huggingface.co/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2) by Sentence Transformers.
+- **Sound**: [GeneralUser GS](https://github.com/mrbumpy409/GeneralUser-GS) SoundFont by S. Christian Collins.
+
+## License
+
+The code is released under the [MIT License](LICENSE).

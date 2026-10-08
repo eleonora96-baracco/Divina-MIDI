@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Divina MIDI</title>
+<meta name="description" content="Dante's Divina Commedia turned into music in three ways: Word2Vec, contextual embeddings and sentiment analysis.">
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --axis: #c3c2b7;
+    --border: rgba(11, 11, 11, 0.10);
+    --accent: #2a78d6;
+    --inferno: #2a78d6;
+    --purgatorio: #eb6834;
+    --paradiso: #1baf7a;
+    --mode-0: #0d366b; --mode-1: #184f95; --mode-2: #256abf;
+    --mode-3: #3987e5; --mode-4: #6da7ec; --mode-5: #86b6ef;
+    --mode-ink-dark: #ffffff; --mode-ink-light: #0b0b0b;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+      --grid: #2c2c2a; --axis: #383835; --border: rgba(255, 255, 255, 0.10); --accent: #3987e5;
+      --inferno: #3987e5; --purgatorio: #d95926; --paradiso: #199e70;
+      --mode-0: #184f95; --mode-1: #256abf; --mode-2: #3987e5;
+      --mode-3: #5598e7; --mode-4: #86b6ef; --mode-5: #b7d3f6;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255, 255, 255, 0.10); --accent: #3987e5;
+    --inferno: #3987e5; --purgatorio: #d95926; --paradiso: #199e70;
+    --mode-0: #184f95; --mode-1: #256abf; --mode-2: #3987e5;
+    --mode-3: #5598e7; --mode-4: #86b6ef; --mode-5: #b7d3f6;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--page); color: var(--ink);
+    font: 16px/1.6 var(--sans); -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 960px; margin: 0 auto; padding: 56px 16px 72px; }
+  h1, h2, h3 { font-family: var(--serif); font-weight: 600; line-height: 1.2; margin: 0; }
+  h1 { font-size: clamp(2.2rem, 6vw, 3.2rem); letter-spacing: -0.01em; }
+  h2 { font-size: 1.6rem; margin: 64px 0 12px; }
+  h3 { font-size: 1.15rem; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 1.15rem; color: var(--ink-2); max-width: 680px; margin-top: 16px; }
+  .verse { font-family: var(--serif); font-style: italic; color: var(--muted); margin-top: 28px; }
+  a { color: var(--accent); }
+  .muted { color: var(--muted); font-size: 0.9rem; }
+
+  .levels { display: grid; gap: 16px; margin-top: 20px; }
+  .level {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px;
+    display: grid; grid-template-columns: minmax(200px, 1fr) 2fr; gap: 20px; align-items: start;
+  }
+  .level .num { font-family: var(--serif); color: var(--muted); font-size: 0.95rem; }
+  .level h3 { margin: 2px 0 8px; }
+  .level p { color: var(--ink-2); font-size: 0.95rem; margin: 0; }
+  .players { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .player { display: grid; gap: 6px; }
+  .player span { font-size: 0.85rem; color: var(--ink-2); display: flex; align-items: center; gap: 6px; }
+  .swatch { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+  audio { width: 100%; height: 36px; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px; margin-top: 16px;
+  }
+  .card h3 { margin-bottom: 4px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 10px 0 6px; font-size: 0.85rem; color: var(--ink-2); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .chart { position: relative; }
+  .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .chart text { font-family: var(--sans); }
+  .tooltip {
+    position: absolute; pointer-events: none; background: var(--surface); color: var(--ink);
+    border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12); white-space: nowrap; opacity: 0; transition: opacity 0.1s;
+  }
+  .tooltip b { font-variant-numeric: tabular-nums; }
+  details { margin-top: 12px; font-size: 0.9rem; color: var(--ink-2); }
+  summary { cursor: pointer; color: var(--muted); }
+  table { border-collapse: collapse; margin-top: 8px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 4px 12px 4px 0; text-align: left; border-bottom: 1px solid var(--grid); }
+
+  .mapping { width: 100%; margin-top: 12px; }
+  .mapping td:first-child { color: var(--ink-2); width: 40%; }
+  footer { margin-top: 72px; padding-top: 20px; border-top: 1px solid var(--grid); }
+
+  @media (max-width: 720px) {
+    main { padding-top: 36px; }
+    .level { grid-template-columns: 1fr; }
+    .players { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Divina MIDI</h1>
+    <p class="lede">Dante's <em>Divina Commedia</em> turned into music in three ways, each a step closer to music that means something. Every word of the poem becomes a note, so a canto lasts about as long as reading it aloud.</p>
+    <p class="verse">“l'amor che move il sole e l'altre stelle” — Paradiso XXXIII, 145</p>
+  </header>
+
+  <section>
+    <h2>Listen</h2>
+    <p>The first minute of Canto I of each cantica, rendered three ways. Listen across a row to hear the journey from Hell to Paradise; down a column to hear what each method adds.</p>
+    <div class="levels" id="levels"></div>
+    <p class="muted">Rendered with the <a href="https://github.com/mrbumpy409/GeneralUser-GS">GeneralUser GS</a> SoundFont. Full cantos (10 to 13 minutes each) can be generated with the code.</p>
+  </section>
+
+  <section>
+    <h2>The emotional arc</h2>
+    <p>The sentiment level relies on two Italian classifiers reading each tercet. Their scores follow the arc of the poem: the Inferno is the darkest cantica, the Paradiso the brightest. Canto IV of the Inferno, the Limbo of the great poets of antiquity, is its least painful canto.</p>
+
+    <div class="card">
+      <h3>Valence of each canto</h3>
+      <p class="muted">Mean sentiment of the canto's tercets (classifier logits; higher is more positive)</p>
+      <div class="legend" id="arc-legend"></div>
+      <div class="chart" id="arc"></div>
+      <details><summary>Show as a table</summary><div id="arc-table"></div></details>
+    </div>
+
+    <div class="card">
+      <h3>Which modes each cantica is played in</h3>
+      <p class="muted">Share of tercets per musical mode, from darkest (Phrygian) to brightest (Lydian)</p>
+      <div class="legend" id="modes-legend"></div>
+      <div class="chart" id="modes"></div>
+      <details><summary>Show as a table</summary><div id="modes-table"></div></details>
+    </div>
+  </section>
+
+  <section>
+    <h2>How the sentiment becomes music</h2>
+    <table class="mapping">
+      <tr><td>Valence (positive vs negative)</td><td>Musical mode, from Phrygian (darkest) through minor and major to Lydian (brightest)</td></tr>
+      <tr><td>Arousal (anger, fear, joy vs sadness)</td><td>Speed and loudness</td></tr>
+      <tr><td>Cantica</td><td>Register: the Inferno low, the Paradiso high</td></tr>
+      <tr><td>Tercet</td><td>Verses end on the fifth, the third, then the root: open, open, closed</td></tr>
+    </table>
+    <p style="margin-top:16px">Scores are smoothed over neighbouring tercets, so the music follows the emotional arc rather than reacting to every line. The models have limits worth knowing: they read words, not irony, and they find Dante's language gloomy overall, which is why only the relative position of a tercet within the poem is used. The <a href="https://github.com/eleonora96-baracco/Divina-MIDI/blob/main/notebooks/01_sentiment_feasibility.ipynb">feasibility notebook</a> shows where they succeed and where they fail.</p>
+  </section>
+
+  <footer class="muted">
+    <p>Code on <a href="https://github.com/eleonora96-baracco/Divina-MIDI">GitHub</a> (MIT licence).
+    Text from <a href="https://it.wikisource.org/wiki/Divina_Commedia">Italian Wikisource</a> (CC BY-SA 4.0).
+    Models: <a href="https://huggingface.co/MilaNLProc/feel-it-italian-sentiment">feel-it</a> by MilaNLProc,
+    <a href="https://huggingface.co/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2">paraphrase-multilingual-MiniLM</a> by Sentence Transformers.</p>
+  </footer>
+</main>
+
+<script src="data.js"></script>
+<script>
+(() => {
+  const CANTICHE = ["Inferno", "Purgatorio", "Paradiso"];
+  const LEVELS = [
+    { key: "word2vec_word", name: "Word2Vec",
+      text: "Vectors learned from the poem itself drive pitch and loudness. Their dimensions mean nothing, so the music is artistic but arbitrary: the three cantiche sound almost the same." },
+    { key: "embeddings_word", name: "Contextual embeddings",
+      text: "A multilingual language model reads each verse. Its main axes follow the structure of the language (function words vs content words, Dante speaking of himself vs the world), not its emotions." },
+    { key: "sentiment", name: "Sentiment",
+      text: "Classifiers score each tercet's valence and energy, which set the mode, speed and loudness; the cantica sets the register. The journey from Hell to Paradise becomes audible." },
+  ];
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const svgNS = "http://www.w3.org/2000/svg";
+  const el = (tag, attrs = {}, parent) => {
+    const node = document.createElementNS(svgNS, tag);
+    for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+    if (parent) parent.appendChild(node);
+    return node;
+  };
+  const roman = (n) => [[10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"]]
+    .reduce((acc, [v, s]) => { while (n >= v) { acc += s; n -= v; } return acc; }, "");
+  const fmt = (v) => (v < 0 ? "−" : "") + Math.abs(v).toFixed(2);
+
+  // Players
+  const levels = document.getElementById("levels");
+  LEVELS.forEach((level, i) => {
+    const row = document.createElement("div");
+    row.className = "level";
+    row.innerHTML = `<div><div class="num">Level ${i + 1}</div><h3>${level.name}</h3><p>${level.text}</p></div>
+      <div class="players">${CANTICHE.map((c) => `
+        <label class="player"><span><i class="swatch" style="background:var(--${c.toLowerCase()})"></i>${c} I</span>
+        <audio controls preload="none" src="audio/${c.toLowerCase()}_01_${level.key}.mp3"></audio></label>`).join("")}
+      </div>`;
+    levels.appendChild(row);
+  });
+  // Only one excerpt plays at a time.
+  document.addEventListener("play", (e) => {
+    document.querySelectorAll("audio").forEach((a) => { if (a !== e.target) a.pause(); });
+  }, true);
+
+  const data = window.DEMO_DATA;
+  if (!data) return;
+
+  const legend = (id, items) => {
+    document.getElementById(id).innerHTML = items
+      .map(([label, color]) => `<span><i class="swatch" style="background:${color}"></i>${label}</span>`).join("");
+  };
+  const table = (id, head, rows) => {
+    document.getElementById(id).innerHTML = `<table><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr>${
+      rows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("")}</table>`;
+  };
+  function tooltip(container) {
+    const tip = document.createElement("div");
+    tip.className = "tooltip";
+    container.appendChild(tip);
+    return {
+      show(html, x, y) {
+        tip.innerHTML = html;
+        tip.style.opacity = 1;
+        const w = tip.offsetWidth, max = container.clientWidth;
+        tip.style.left = Math.min(Math.max(x - w / 2, 0), max - w) + "px";
+        tip.style.top = (y - tip.offsetHeight - 12) + "px";
+      },
+      hide() { tip.style.opacity = 0; },
+    };
+  }
+
+  // Valence per canto
+  function drawArc() {
+    const box = document.getElementById("arc");
+    box.innerHTML = "";
+    const width = Math.max(box.clientWidth, 300), height = width < 500 ? 240 : 300;
+    const m = { top: 12, right: 12, bottom: 30, left: 40 };
+    const pts = data.valence.map((d, i) => ({ ...d, x: i + 1 }));
+    const vals = pts.map((p) => p.valence);
+    const lo = Math.floor(Math.min(...vals)) - 0.5, hi = Math.ceil(Math.max(...vals, 0)) + 0.5;
+    const sx = (x) => m.left + (x - 0.5) / pts.length * (width - m.left - m.right);
+    const sy = (v) => m.top + (hi - v) / (hi - lo) * (height - m.top - m.bottom);
+
+    const svg = el("svg", { viewBox: `0 0 ${width} ${height}`, role: "img",
+      "aria-label": "Line chart of mean valence for each of the 100 cantos, rising from the Inferno to the Paradiso" }, box);
+    for (let v = Math.ceil(lo); v <= hi; v += 2) {
+      el("line", { x1: m.left, x2: width - m.right, y1: sy(v), y2: sy(v),
+        stroke: v === 0 ? css("--axis") : css("--grid"), "stroke-width": v === 0 ? 1.5 : 1 }, svg);
+      el("text", { x: m.left - 8, y: sy(v) + 4, "text-anchor": "end", "font-size": 11, fill: css("--muted") }, svg)
+        .textContent = fmt(v).replace(".00", "");
+    }
+    CANTICHE.forEach((c) => {
+      const part = pts.filter((p) => p.cantica === c);
+      const color = css(`--${c.toLowerCase()}`);
+      el("polyline", { points: part.map((p) => `${sx(p.x)},${sy(p.valence)}`).join(" "),
+        fill: "none", stroke: color, "stroke-width": 2, "stroke-linejoin": "round" }, svg);
+      part.forEach((p) => el("circle", { cx: sx(p.x), cy: sy(p.valence), r: 2.5, fill: color }, svg));
+      const mid = part[Math.floor(part.length / 2)];
+      el("text", { x: sx(mid.x), y: height - 8, "text-anchor": "middle", "font-size": 12, fill: css("--ink-2") }, svg)
+        .textContent = c;
+    });
+
+    const cross = el("line", { y1: m.top, y2: height - m.bottom, stroke: css("--axis"), "stroke-width": 1, opacity: 0 }, svg);
+    const dot = el("circle", { r: 5, "stroke-width": 2, stroke: css("--surface"), opacity: 0 }, svg);
+    const tip = tooltip(box);
+    const hit = el("rect", { x: m.left, y: 0, width: width - m.left - m.right, height, fill: "transparent" }, svg);
+    const move = (evt) => {
+      const rect = svg.getBoundingClientRect();
+      const px = (evt.clientX - rect.left) * width / rect.width;
+      const p = pts[Math.min(pts.length - 1, Math.max(0, Math.round((px - m.left) / (width - m.left - m.right) * pts.length - 0.5)))];
+      cross.setAttribute("x1", sx(p.x)); cross.setAttribute("x2", sx(p.x)); cross.setAttribute("opacity", 1);
+      dot.setAttribute("cx", sx(p.x)); dot.setAttribute("cy", sy(p.valence));
+      dot.setAttribute("fill", css(`--${p.cantica.toLowerCase()}`)); dot.setAttribute("opacity", 1);
+      tip.show(`${p.cantica} ${roman(p.canto)} · valence <b>${fmt(p.valence)}</b>`,
+        sx(p.x) * rect.width / width, sy(p.valence) * rect.height / height);
+    };
+    hit.addEventListener("pointermove", move);
+    hit.addEventListener("pointerleave", () => { tip.hide(); cross.setAttribute("opacity", 0); dot.setAttribute("opacity", 0); });
+  }
+
+  // Mode shares per cantica
+  function drawModes() {
+    const box = document.getElementById("modes");
+    box.innerHTML = "";
+    const width = Math.max(box.clientWidth, 300), barH = 30, gap = 14, left = 84;
+    const height = CANTICHE.length * (barH + gap);
+    const svg = el("svg", { viewBox: `0 0 ${width} ${height}`, role: "img",
+      "aria-label": "Stacked bars of the share of tercets in each musical mode, per cantica" }, box);
+    const tip = tooltip(box);
+    const sx = (v) => v * (width - left - 4);
+    CANTICHE.forEach((c, row) => {
+      const y = row * (barH + gap);
+      el("text", { x: 0, y: y + barH / 2 + 5, "font-size": 13, fill: css("--ink-2") }, svg).textContent = c;
+      let x = left;
+      data.modeShares[c].forEach((share, i) => {
+        const w = sx(share);
+        if (w <= 0) return;
+        const seg = el("rect", { x: x + 1, y, width: Math.max(w - 2, 0.5), height: barH,
+          rx: 3, fill: css(`--mode-${i}`) }, svg);
+        if (w > 38) {
+          el("text", { x: x + w / 2, y: y + barH / 2 + 4, "text-anchor": "middle", "font-size": 11,
+            fill: i < 3 ? css("--mode-ink-dark") : css("--mode-ink-light"), "pointer-events": "none" }, svg)
+            .textContent = Math.round(share * 100) + "%";
+        }
+        const label = data.modes[i][0].toUpperCase() + data.modes[i].slice(1);
+        const cx = x + w / 2;
+        seg.addEventListener("pointermove", () => {
+          const rect = svg.getBoundingClientRect();
+          tip.show(`${c} · ${label} <b>${Math.round(share * 100)}%</b>`, cx * rect.width / width, y * rect.height / height);
+        });
+        seg.addEventListener("pointerleave", () => tip.hide());
+        x += w;
+      });
+    });
+  }
+
+  const modeNames = data.modes.map((m) => m[0].toUpperCase() + m.slice(1));
+  const draw = () => {
+    legend("arc-legend", CANTICHE.map((c) => [c, css(`--${c.toLowerCase()}`)]));
+    legend("modes-legend", modeNames.map((m, i) => [m, css(`--mode-${i}`)]));
+    drawArc();
+    drawModes();
+  };
+  table("arc-table", ["Cantica", "Canto", "Valence"],
+    data.valence.map((d) => [d.cantica, roman(d.canto), fmt(d.valence)]));
+  table("modes-table", ["Cantica", ...modeNames],
+    CANTICHE.map((c) => [c, ...data.modeShares[c].map((s) => Math.round(s * 100) + "%")]));
+  draw();
+  let timer;
+  window.addEventListener("resize", () => { clearTimeout(timer); timer = setTimeout(draw, 150); });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw);
+})();
+</script>
+</body>
+</html>

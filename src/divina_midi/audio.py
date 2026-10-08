@@ -10,7 +10,6 @@ Requires the ``audio`` extra: ``pip install -e ".[audio]"``.
 
 from __future__ import annotations
 
-import wave
 from pathlib import Path
 
 import mido
@@ -80,14 +79,27 @@ def render_audio(midi_path: Path, soundfont: Path = DEFAULT_SOUNDFONT,
     return audio
 
 
-def write_wav(audio: np.ndarray, path: Path, sample_rate: int = SAMPLE_RATE) -> Path:
-    """Save stereo float samples as a 16-bit WAV file."""
+def excerpt(audio: np.ndarray, seconds: float, fade: float = 3.0,
+            sample_rate: int = SAMPLE_RATE) -> np.ndarray:
+    """The first ``seconds`` of the audio, fading out over the last ``fade`` seconds."""
+    clip = audio[: int(seconds * sample_rate)].copy()
+    n_fade = min(int(fade * sample_rate), len(clip))
+    if n_fade:
+        clip[-n_fade:] *= np.linspace(1.0, 0.0, n_fade, dtype=clip.dtype)[:, None]
+    return clip
+
+
+def write_audio(audio: np.ndarray, path: Path, sample_rate: int = SAMPLE_RATE) -> Path:
+    """Save stereo float samples; the format follows the extension (.wav or .mp3)."""
+    import soundfile
+
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    pcm = (np.clip(audio, -1.0, 1.0) * 32767).astype("<i2")
-    with wave.open(str(path), "wb") as out:
-        out.setnchannels(2)
-        out.setsampwidth(2)
-        out.setframerate(sample_rate)
-        out.writeframes(pcm.tobytes())
+    samples = np.clip(audio, -1.0, 1.0)
+    if path.suffix.lower() == ".mp3":
+        # Variable bitrate around 100 kbps: transparent for piano and strings, ~0.7 MB a minute.
+        soundfile.write(path, samples, sample_rate, format="MP3", subtype="MPEG_LAYER_III",
+                        bitrate_mode="VARIABLE", compression_level=0.5)
+    else:
+        soundfile.write(path, samples, sample_rate, subtype="PCM_16")
     return path
