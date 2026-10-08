@@ -19,6 +19,9 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=7"]
+# feel-it's 2021 tokenizer files don't load with transformers 5.
+sentiment = ["transformers>=4.40,<5","torch>=2.6", "sentencepiece", "protobuf"]
+notebooks = ["jupyter", "matplotlib"]
 
 [project.scripts]
 divina-midi = "divina_midi.cli:main"
