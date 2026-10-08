@@ -69,6 +69,21 @@ def render_vectors(text, args: argparse.Namespace) -> None:
     print(f"Saved {len(notes)} notes to {out}")
 
 
+def cmd_audio(args: argparse.Namespace) -> None:
+    from . import audio
+
+    paths = []
+    for path in args.paths:
+        paths += sorted(path.glob("*.mid")) if path.is_dir() else [path]
+    if not paths:
+        raise SystemExit("No .mid files found")
+
+    soundfont = audio.ensure_soundfont(args.soundfont)
+    for path in paths:
+        wav = audio.write_wav(audio.render_audio(path, soundfont), path.with_suffix(".wav"))
+        print(f"Saved {wav}")
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="divina-midi")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -93,6 +108,13 @@ def main(argv: list[str] | None = None) -> None:
     render.add_argument("--corpus", type=Path, default=corpus.DEFAULT_PATH)
     render.add_argument("--out", type=Path, help="output .mid path (default: output/...)")
     render.set_defaults(func=cmd_render)
+
+    to_audio = sub.add_parser("audio", help="render MIDI files to WAV with a SoundFont")
+    to_audio.add_argument("paths", nargs="*", type=Path, default=[Path("output")],
+                          help=".mid files or folders (default: output/)")
+    to_audio.add_argument("--soundfont", type=Path, default=Path("data") / "soundfonts" / "GeneralUser-GS.sf2",
+                          help="SoundFont file (the default one is downloaded on first use)")
+    to_audio.set_defaults(func=cmd_audio)
 
     args = parser.parse_args(argv)
     args.func(args)

@@ -68,6 +68,18 @@ Files are written to `output/`, e.g. `output/inferno_01_embeddings_word.mid`. Th
 | `--scale` | levels 1-2: `c_major`, `a_minor`, `c_pentatonic`, `chromatic` | `c_major` |
 | `--seed` | level 1: random seed for Word2Vec training | `42` |
 
+### Listening
+
+A MIDI file holds instructions, not sound: how it sounds depends on the player, and the synthesizer built into Windows is notably harsh. To get audio that sounds the same everywhere, render the files to WAV with a SoundFont:
+
+```bash
+pip install -e ".[audio]"
+divina-midi audio                 # every .mid file in output/
+divina-midi audio output/inferno_01_sentiment.mid
+```
+
+The first run downloads [GeneralUser GS](https://github.com/mrbumpy409/GeneralUser-GS) (32 MB, free to use) into `data/soundfonts/`; use `--soundfont` for another one.
+
 ## How text becomes music
 
 All three levels share the same principles: every feature's range is learned from the **whole poem**, ignoring outliers, so the same value gives the same music in every canto; and the **terza rima** is always audible, with rests between verses and tercets and an accent on the note that closes each tercet.
