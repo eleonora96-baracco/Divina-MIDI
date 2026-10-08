@@ -25,6 +25,12 @@ def tokenize(text: str) -> list[str]:
     return _WORD.findall(normalize(text).lower())
 
 
+def word_spans(text: str) -> tuple[str, list[tuple[int, int]]]:
+    """The normalized verse and the character span of each word ``tokenize`` returns."""
+    normalized = normalize(text)
+    return normalized, [match.span() for match in _WORD.finditer(normalized)]
+
+
 def words(corpus: pd.DataFrame) -> pd.DataFrame:
     """One row per word: its verse position, index in the verse, the word and its length."""
     rows = [

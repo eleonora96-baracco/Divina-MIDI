@@ -5,10 +5,8 @@ Turn the cantos of Dante's *Divina Commedia* into MIDI music.
 The project compares approaches of increasing sophistication for translating the text into notes:
 
 1. **Word2Vec**: vectors trained on the text, mapped to pitches. The result is artistic but arbitrary.
-2. **Contextual embeddings** (multilingual BERT): similar verses sound similar.
+2. **Contextual embeddings** (a multilingual sentence model): the music follows the structure of the language, but its axes still have no name.
 3. **Sentiment / emotion**: dimensions with a meaning, mapped onto musical conventions (mode, tempo, dynamics).
-
-> 🚧 Work in progress: the Word2Vec and sentiment levels are available; contextual embeddings are coming.
 
 ## Installation
 
@@ -21,7 +19,7 @@ source .venv/bin/activate       # macOS / Linux
 pip install -e ".[dev]"
 ```
 
-The sentiment level needs PyTorch and Hugging Face Transformers (about 1 GB with the models), so it is an optional extra; the notebooks need Jupyter and Matplotlib:
+The embeddings and sentiment levels need PyTorch and Hugging Face Transformers (about 1.5 GB with the models), so they are an optional extra; the notebooks need Jupyter and Matplotlib:
 
 ```bash
 pip install -e ".[dev,sentiment,notebooks]"
@@ -55,27 +53,34 @@ inferno_1 = select(df, cantica="inferno", canto=1)
 ### Rendering a canto
 
 ```bash
-divina-midi render --cantica inferno --canto 1                      # Word2Vec level
-divina-midi render --cantica inferno --canto 1 --method sentiment   # sentiment level
+divina-midi render --cantica inferno --canto 1                       # level 1: Word2Vec
+divina-midi render --cantica inferno --canto 1 --method embeddings   # level 2: contextual embeddings
+divina-midi render --cantica inferno --canto 1 --method sentiment    # level 3: sentiment
 ```
 
-This writes `output/inferno_01_word2vec_word.mid` or `output/inferno_01_sentiment.mid`. The first sentiment run scores the whole poem (about 8 minutes on a CPU) and caches the results in `data/sentiment/`. Options:
+Files are written to `output/`, e.g. `output/inferno_01_embeddings_word.mid`. The first run of levels 2 and 3 processes the whole poem on a CPU (about 2 minutes for embeddings, 8 for sentiment) and caches the results in `data/`; later runs take seconds. Options:
 
 | Option | Values | Default |
 |---|---|---|
-| `--method` | `word2vec` or `sentiment` | `word2vec` |
+| `--method` | `word2vec`, `embeddings` or `sentiment` | `word2vec` |
 | `--tempo` | beats per minute | `90` |
-| `--unit` | Word2Vec only: `word` (one note per word) or `verse` (one note per verse) | `word` |
-| `--scale` | Word2Vec only: `c_major`, `a_minor`, `c_pentatonic`, `chromatic` | `c_major` |
-| `--seed` | Word2Vec only: random seed for training | `42` |
+| `--unit` | levels 1-2: `word` (one note per word) or `verse` (one note per verse) | `word` |
+| `--scale` | levels 1-2: `c_major`, `a_minor`, `c_pentatonic`, `chromatic` | `c_major` |
+| `--seed` | level 1: random seed for Word2Vec training | `42` |
 
 ## How text becomes music
 
-Both levels share the same principles: every feature's range is learned from the **whole poem**, ignoring outliers, so the same value gives the same music in every canto; and the **terza rima** is always audible, with rests between verses and tercets and an accent on the note that closes each tercet.
+All three levels share the same principles: every feature's range is learned from the **whole poem**, ignoring outliers, so the same value gives the same music in every canto; and the **terza rima** is always audible, with rests between verses and tercets and an accent on the note that closes each tercet.
 
 ### Level 1: Word2Vec
 
 Each word becomes a vector trained on the whole poem. One dimension drives the pitch (within the chosen scale), another the velocity, and the word length the duration. The vector dimensions have no meaning, so the music follows word co-occurrence patterns: the three cantiche end up with almost the same distribution of notes.
+
+### Level 2: contextual embeddings
+
+Each word gets a vector from [paraphrase-multilingual-MiniLM-L12-v2](https://huggingface.co/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2), computed inside its verse: unlike Word2Vec, the same word can sound different in different contexts. A single PCA fitted on the whole poem reduces the vectors to their main axes; the first drives the pitch, the second the velocity.
+
+The axes capture the structure of the language rather than its emotions. The first separates function words (*e, che, ma, di*) from content words (*fondo, petto, terra*); the second separates Dante speaking about himself (*io, mi, dissi, fui*) from descriptions of the world (*luce, sole, mondo, ombra*). The three cantiche differ a little (the Paradiso is somewhat louder), but nothing a listener could name.
 
 ### Level 3: sentiment
 

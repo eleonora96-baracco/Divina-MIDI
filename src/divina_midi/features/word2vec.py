@@ -12,7 +12,7 @@ import pandas as pd
 from gensim.models import Word2Vec
 
 from ..text import tokenize, words
-from . import POSITION_COLUMNS
+from . import mean_by_verse
 
 
 def train(corpus: pd.DataFrame, vector_size: int = 8, window: int = 5,
@@ -40,6 +40,4 @@ def word_features(corpus: pd.DataFrame, model: Word2Vec) -> pd.DataFrame:
 
 def verse_features(corpus: pd.DataFrame, model: Word2Vec) -> pd.DataFrame:
     """One row per verse: mean of its word vectors and mean word length."""
-    words = word_features(corpus, model)
-    numeric = ["length"] + _dim_columns(model)
-    return words.groupby(POSITION_COLUMNS, sort=False, as_index=False)[numeric].mean()
+    return mean_by_verse(word_features(corpus, model), ["length"] + _dim_columns(model))

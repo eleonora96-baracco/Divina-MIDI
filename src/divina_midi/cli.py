@@ -24,7 +24,7 @@ def cmd_render(args: argparse.Namespace) -> None:
     if args.method == "sentiment":
         render_sentiment(text, args)
     else:
-        render_word2vec(text, args)
+        render_vectors(text, args)
 
 
 def render_sentiment(text, args: argparse.Namespace) -> None:
@@ -44,15 +44,25 @@ def render_sentiment(text, args: argparse.Namespace) -> None:
     print("Modes used:", ", ".join(f"{mode} {count}" for mode, count in modes.items()))
 
 
-def render_word2vec(text, args: argparse.Namespace) -> None:
-    from .features import word2vec
+def render_vectors(text, args: argparse.Namespace) -> None:
+    """Word2Vec or contextual embeddings: two vector features drive pitch and velocity."""
+    if args.method == "word2vec":
+        from .features import word2vec
 
-    model = word2vec.train(text, seed=args.seed)
-    extract = word2vec.word_features if args.unit == "word" else word2vec.verse_features
+        model = word2vec.train(text, seed=args.seed)
+        extract = word2vec.word_features if args.unit == "word" else word2vec.verse_features
+        features = extract(text, model)
+        pitch, velocity = "dim_0", "dim_1"
+    else:
+        from .features import embeddings
+
+        # First run embeds the whole poem (a few minutes); later runs read the cache.
+        extract = embeddings.word_features if args.unit == "word" else embeddings.verse_features
+        features = extract(text)
+        pitch, velocity = "pc_0", "pc_1"
 
     # Fit the mapping on the whole poem so every canto shares the same scale.
-    features = extract(text, model)
-    mapping = Mapping(scale=args.scale).fit(features)
+    mapping = Mapping(pitch_feature=pitch, velocity_feature=velocity, scale=args.scale).fit(features)
     notes = mapping.render(corpus.select(features, cantica=args.cantica, canto=args.canto))
     out = args.out or Path("output") / f"{args.cantica.lower()}_{args.canto:02d}_{args.method}_{args.unit}.mid"
     write_midi(notes, out, tempo_bpm=args.tempo)
@@ -72,12 +82,12 @@ def main(argv: list[str] | None = None) -> None:
     render.add_argument("--cantica", required=True, choices=[c.lower() for c in corpus.CANTICHE],
                         type=str.lower)
     render.add_argument("--canto", required=True, type=int)
-    render.add_argument("--method", default="word2vec", choices=["word2vec", "sentiment"],
-                        help="sentiment needs the 'sentiment' extra")
+    render.add_argument("--method", default="word2vec", choices=["word2vec", "embeddings", "sentiment"],
+                        help="embeddings and sentiment need the 'sentiment' extra")
     render.add_argument("--unit", default="word", choices=["word", "verse"],
-                        help="word2vec only: one note per word or per verse")
+                        help="word2vec/embeddings: one note per word or per verse")
     render.add_argument("--scale", default="c_major", choices=sorted(SCALES),
-                        help="word2vec only (with sentiment the text picks the mode)")
+                        help="word2vec/embeddings (with sentiment the text picks the mode)")
     render.add_argument("--tempo", type=float, default=90, help="beats per minute")
     render.add_argument("--seed", type=int, default=42)
     render.add_argument("--corpus", type=Path, default=corpus.DEFAULT_PATH)
